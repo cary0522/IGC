@@ -36,7 +36,9 @@ function GetFinialImg() {
   html2canvas(container, {
     useCORS: true,
     allowTaint: true,
-    scale: 1
+    scale: 1,
+    backgroundColor: '#ffffff',
+    dpi: window.devicePixelRatio * 4
   }).then((canvas) => {
     const imgData = canvas.toDataURL('image/jpeg', 1.0);
     const link = document.createElement('a');
@@ -52,7 +54,7 @@ function GetFinialImg() {
   <div>
     <v-file-input label="上傳照片" :hide-input="true" placeholder="上傳照片" prepend-icon="mdi-image" type="file"
       accept="image/*" @change="fileUpload" multiple class="mx-auto w-1/2 my-4" />
-    <div id="imgContainer">
+    <div id="imgContainer" class="mx-auto">
       <div id="imagePreview" class="w-full flex flex-wrap">
         <template v-for="file, index in fileInput" :key="index">
           <VueCropper style="width: 50%; height: 50%" :img="file" :outputSize="1" outputType="jpeg" :autoCrop="false"
