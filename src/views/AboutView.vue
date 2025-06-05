@@ -43,7 +43,7 @@ function fileUpload(event) {
     }
   }
 }
-
+const imgData = ref('');
 function GetFinialImg() {
   const container = document.querySelector('#imagePreview');
   html2canvas(container, {
@@ -51,13 +51,30 @@ function GetFinialImg() {
     allowTaint: true,
     scale: 3,
     backgroundColor: '#ffffff',
-    dpi: 300
+    dpi: 300,
+    width: container.offsetWidth,
+    height: container.offsetHeight
   }).then((canvas) => {
-    const imgData = canvas.toDataURL('image/jpeg', 1.0);
+    imgData.value = canvas.toDataURL('image/jpeg', 1.0);
     const link = document.createElement('a');
-    link.href = imgData;
+    link.href = imgData.value;
     link.download = `final-image-${Date.now()}.jpg`;
     link.click();
+  });
+}
+
+function ReviewImg() {
+  const container = document.querySelector('#imagePreview');
+  html2canvas(container, {
+    useCORS: true,
+    allowTaint: true,
+    scale: 3,
+    backgroundColor: '#ffffff',
+    dpi: 300,
+    width: container.offsetWidth,
+    height: container.offsetHeight
+  }).then((canvas) => {
+    imgData.value = canvas.toDataURL('image/jpeg', 1.0);
   });
 }
 </script>
@@ -68,56 +85,47 @@ function GetFinialImg() {
       <v-btn value="two">兩張照片</v-btn>
       <v-btn value="four">四張照片</v-btn>
     </v-btn-toggle>
-  </div>
-  <div v-if="PictureToggle == 'two'">
     <v-file-input label="上傳照片" :hide-input="true" placeholder="上傳照片" prepend-icon="mdi-image" type="file"
       accept="image/*" @change="fileUpload" multiple class="mx-auto w-1/2 my-4" />
-    <div id="imgContainer" class="mx-auto">
-      <div id="imagePreview" class="w-full flex flex-wrap">
-        <template v-for="file, index in fileInput" :key="index">
-          <VueCropper style="width: 50%; height: 100%" :img="file" :outputSize="1" outputType="jpeg" :autoCrop="false"
-            :autoCropWidth="540" :autoCropHeight="1350" :canMoveBox="true" :canMove="true" :fixedBox="false"
-            :centerBox="false" :ref="cropper[index]" :info="false" mode="cover" />
-        </template>
-      </div>
-    </div>
-    <div class="my-2 flex justify-center w-full">
-      <v-btn @click="GetFinialImg" class="mx-2">下載</v-btn>
-      <!-- <v-btn @click="ResetCrop" class="mx-2">重置</v-btn> -->
-    </div>
   </div>
-  <div v-if="PictureToggle == 'four'">
-    <v-file-input label="上傳照片" :hide-input="true" placeholder="上傳照片" prepend-icon="mdi-image" type="file"
-      accept="image/*" @change="fileUpload" multiple class="mx-auto w-1/2 my-4" />
-    <div id="imgContainer" class="mx-auto">
-      <div id="imagePreview" class="w-full flex flex-wrap">
-        <template v-for="file, index in fileInput" :key="index">
-          <VueCropper style="width: 50%; height: 50%" :img="file" :outputSize="1" outputType="jpeg" :autoCrop="false"
-            :autoCropWidth="540" :autoCropHeight="675" :canMoveBox="true" :canMove="true" :fixedBox="false"
-            :centerBox="false" :ref="cropper[index]" :info="false" mode="cover" />
-        </template>
-      </div>
-    </div>
-    <div class="my-2 flex justify-center w-full">
-      <v-btn @click="GetFinialImg" class="mx-2">下載</v-btn>
-      <!-- <v-btn @click="ResetCrop" class="mx-2">重置</v-btn> -->
-    </div>
-  </div>
-  <!-- 讀取畫面 開始 -->
-  <!-- <div class="w-full h-full fixed top-0 left-0 z-[100] flex flex-wrap justify-center items-center bg-white bg-opacity-90 text-2xl text-gray-700 font-bold transition-all" v-if="Loading">
-        <div>
-            <img :src="LoadingImg" alt="">
-            <div class="w-full text-center text-[#3e6ea8]">Loading ...</div>
+  <div class="w-full lg:flex justify-center items-start">
+    <div class="w-full lg:w-1/3 mx-auto my-4">
+      <div v-if="PictureToggle == 'two'">
+        <div class="imgContainer mx-auto">
+          <div id="imagePreview" class="w-full flex flex-wrap">
+            <template v-for="file, index in fileInput" :key="index">
+              <VueCropper style="width: 50%; height: 100%" :img="file" :outputSize="1" outputType="jpeg"
+                :autoCrop="false" :autoCropWidth="540" :autoCropHeight="max" :canMoveBox="true" :canMove="true"
+                :fixedBox="false" :centerBox="false" :ref="cropper[index]" :info="false" mode="cover" />
+            </template>
+          </div>
         </div>
-    </div> -->
-  <!-- 讀取畫面 結束 -->
+      </div>
+      <div v-if="PictureToggle == 'four'">
+        <div class="imgContainer mx-auto">
+          <div id="imagePreview" class="w-full flex flex-wrap">
+            <template v-for="file, index in fileInput" :key="index">
+              <VueCropper style="width: 50%; height: 50%" :img="file" :outputSize="1" outputType="jpeg"
+                :autoCrop="false" :autoCropWidth="540" :autoCropHeight="675" :canMoveBox="true" :canMove="true"
+                :fixedBox="false" :centerBox="false" :ref="cropper[index]" :info="false" mode="cover" />
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="my-2 flex justify-center w-full lg:w-[200px] mx-auto">
+      <v-btn @click="GetFinialImg" class="mx-2">下載</v-btn>
+      <v-btn @click="ReviewImg" class="mx-2">預覽</v-btn>
+    </div>
+    <img :src="imgData" alt="" class="my-4 w-full lg:w-1/3  max-w-[1080px] mx-auto" />
+  </div>
 </template>
 
 <style>
-#imgContainer {
+.imgContainer {
   border: 1px solid #000000;
-  max-width: 1080px;
-  max-height: 1350px;
+  max-width: 1082px;
+  max-height: 1352px;
 }
 
 #imagePreview {
