@@ -4,6 +4,8 @@ import { VueCropper } from "vue-cropper";
 import "vue-cropper/dist/index.css";
 import html2canvas from 'html2canvas';
 import 'animate.css';
+import LoadingImg from '/Loading.gif'
+const Loading = ref(false);
 
 const cropper = ref([]);
 
@@ -36,9 +38,9 @@ function GetFinialImg() {
   html2canvas(container, {
     useCORS: true,
     allowTaint: true,
-    scale: 1,
+    scale: 3,
     backgroundColor: '#ffffff',
-    dpi: window.devicePixelRatio * 4
+    dpi: 300
   }).then((canvas) => {
     const imgData = canvas.toDataURL('image/jpeg', 1.0);
     const link = document.createElement('a');
@@ -68,6 +70,14 @@ function GetFinialImg() {
       <!-- <v-btn @click="ResetCrop" class="mx-2">重置</v-btn> -->
     </div>
   </div>
+  <!-- 讀取畫面 開始 -->
+  <!-- <div class="w-full h-full fixed top-0 left-0 z-[100] flex flex-wrap justify-center items-center bg-white bg-opacity-90 text-2xl text-gray-700 font-bold transition-all" v-if="Loading">
+        <div>
+            <img :src="LoadingImg" alt="">
+            <div class="w-full text-center text-[#3e6ea8]">Loading ...</div>
+        </div>
+    </div> -->
+  <!-- 讀取畫面 結束 -->
 </template>
 
 <style>
