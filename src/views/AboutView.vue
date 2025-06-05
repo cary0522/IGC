@@ -7,6 +7,8 @@ import 'animate.css';
 import LoadingImg from '/Loading.gif'
 const Loading = ref(false);
 
+const PictureToggle = ref('two');
+
 const cropper = ref([]);
 
 // 重置裁切區域
@@ -23,13 +25,22 @@ const ResetCrop = () => {
 const fileInput = ref([]);
 
 function fileUpload(event) {
-  for (let i = 0; i < event.target.files.length; i++) {
-    const file = event.target.files[i];
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      fileInput.value.push(e.target.result);
-    };
-    reader.readAsDataURL(file);
+  fileInput.value = [];
+  if (PictureToggle.value == 'two' && event.target.files.length > 2) {
+    alert('只能上傳兩張照片');
+    return;
+  } else if (PictureToggle.value == 'four' && event.target.files.length > 4) {
+    alert('只能上傳四張照片');
+    return;
+  } else {
+    for (let i = 0; i < event.target.files.length; i++) {
+      const file = event.target.files[i];
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        fileInput.value.push(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
   }
 }
 
@@ -49,11 +60,33 @@ function GetFinialImg() {
     link.click();
   });
 }
-
 </script>
 
 <template>
   <div>
+    <v-btn-toggle v-model="PictureToggle" class="mx-auto my-4 w-full justify-center" mandatory>
+      <v-btn value="two">兩張照片</v-btn>
+      <v-btn value="four">四張照片</v-btn>
+    </v-btn-toggle>
+  </div>
+  <div v-if="PictureToggle == 'two'">
+    <v-file-input label="上傳照片" :hide-input="true" placeholder="上傳照片" prepend-icon="mdi-image" type="file"
+      accept="image/*" @change="fileUpload" multiple class="mx-auto w-1/2 my-4" />
+    <div id="imgContainer" class="mx-auto">
+      <div id="imagePreview" class="w-full flex flex-wrap">
+        <template v-for="file, index in fileInput" :key="index">
+          <VueCropper style="width: 50%; height: 100%" :img="file" :outputSize="1" outputType="jpeg" :autoCrop="false"
+            :autoCropWidth="540" :autoCropHeight="1350" :canMoveBox="true" :canMove="true" :fixedBox="false"
+            :centerBox="false" :ref="cropper[index]" :info="false" mode="cover" />
+        </template>
+      </div>
+    </div>
+    <div class="my-2 flex justify-center w-full">
+      <v-btn @click="GetFinialImg" class="mx-2">下載</v-btn>
+      <!-- <v-btn @click="ResetCrop" class="mx-2">重置</v-btn> -->
+    </div>
+  </div>
+  <div v-if="PictureToggle == 'four'">
     <v-file-input label="上傳照片" :hide-input="true" placeholder="上傳照片" prepend-icon="mdi-image" type="file"
       accept="image/*" @change="fileUpload" multiple class="mx-auto w-1/2 my-4" />
     <div id="imgContainer" class="mx-auto">
