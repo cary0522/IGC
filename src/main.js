@@ -18,14 +18,10 @@ export default createVuetify({
     },
 })
 
-// import VueCropper from 'vue-cropper';
-// import '/vue-cropper/dist/index.css'
-
 const app = createApp(App)
 
 app.use(createPinia())
 app.use(router)
 app.use(vuetify)
-// app.use(VueCropper)/
 
 app.mount('#app')
