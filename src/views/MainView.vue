@@ -4,8 +4,8 @@ import { VueCropper } from "vue-cropper";
 import "vue-cropper/dist/index.css";
 import html2canvas from 'html2canvas';
 import 'animate.css';
-import LoadingImg from '/Loading.gif'
-const Loading = ref(false);
+import LoadingPage from './LoadingPage.vue'
+const Loading = ref(true);
 
 const PictureSize = ref('4x5');
 const PictureToggle = ref("2");
@@ -188,6 +188,7 @@ watch(PictureSize, async () => {
       <h2 class="text-center text-lg font-bold">長按下方圖片可以儲存到相簿</h2>
       <img :src="imgData" alt="" />
     </div>
+  <LoadingPage :loadingValue="Loading" />
   </div>
 </template>
 
