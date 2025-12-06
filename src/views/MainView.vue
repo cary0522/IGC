@@ -281,9 +281,33 @@ async function GetFinalVideo(isDownload = true) {
       audioTracks.forEach(track => stream.addTrack(track));
     }
 
+    // 嘗試尋找支援的格式，優先使用 MP4 (H.264) 以支援手機相簿
+    const mimeTypes = [
+      'video/mp4;codecs=avc1.42E01E,mp4a.40.2', // H.264 + AAC (Most compatible)
+      'video/mp4',
+      'video/webm;codecs=h264',
+      'video/webm;codecs=vp9',
+      'video/webm'
+    ];
+
+    let selectedMimeType = '';
+    for (const type of mimeTypes) {
+      if (MediaRecorder.isTypeSupported(type)) {
+        selectedMimeType = type;
+        break;
+      }
+    }
+
+    if (!selectedMimeType) {
+      console.warn('No supported mime type found, falling back to default');
+      selectedMimeType = 'video/webm';
+    }
+
+    console.log('Using MIME type:', selectedMimeType);
+
     // 建立影片錄製機，來源包含影片 + 音訊(stream)
     const recorder = new MediaRecorder(stream, {
-      mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm',
+      mimeType: selectedMimeType,
       videoBitsPerSecond: 8000000 
     });
 
@@ -302,14 +326,16 @@ async function GetFinalVideo(isDownload = true) {
         }
       });
 
-      const blob = new Blob(chunks, { type: 'video/webm' });
+      // Determine extension based on mime type
+      const ext = selectedMimeType.includes('mp4') ? 'mp4' : 'webm';
+      const blob = new Blob(chunks, { type: selectedMimeType });
       const url = URL.createObjectURL(blob);
 
       if (isDownload) {
       // 下載模式
         const link = document.createElement('a');
         link.href = url;
-        link.download = `final-video-${Date.now()}.webm`;
+        link.download = `final-video-${Date.now()}.${ext}`;
         link.click();
       } else {
         // 預覽模式
