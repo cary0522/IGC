@@ -94,26 +94,26 @@ function ReviewImg() {
       onclone: (clonedDoc) => {
         const clonedVideos = clonedDoc.querySelectorAll('video');
         const originalVideos = container.querySelectorAll('video');
-        
+
         clonedVideos.forEach((video, index) => {
           const originalVideo = originalVideos[index];
           const canvas = clonedDoc.createElement('canvas');
-          
+
           // Match the displayed size
           const width = originalVideo.offsetWidth;
           const height = originalVideo.offsetHeight;
-          
+
           canvas.width = width;
           canvas.height = height;
-          
+
           // Copy styles
           canvas.style.width = '100%';
           canvas.style.height = '100%';
           canvas.style.objectFit = 'cover'; // Canvas doesn't support this but we draw it manually
-          
+
           const ctx = canvas.getContext('2d');
           drawImageProp(ctx, originalVideo, 0, 0, width, height);
-          
+
           video.parentNode.replaceChild(canvas, video);
         });
       }
@@ -154,54 +154,54 @@ function GetFinialImg() {
 
 // 讓圖片、影片符合容器寬高(來源圖片, 裁切起點(cx, cy), 裁切尺寸(cw, ch), 畫到 canvas 的位置(x, y), 以及大小(w, h))
 function drawImageProp(ctx, img, x, y, w, h, offsetX, offsetY) {
-    if (arguments.length === 2) {
-      // 如果沒有提供 x, y, w, h，則使用 canvas 的寬高
-        x = y = 0;
-        w = ctx.canvas.width;
-        h = ctx.canvas.height;
-    }
+  if (arguments.length === 2) {
+    // 如果沒有提供 x, y, w, h，則使用 canvas 的寬高
+    x = y = 0;
+    w = ctx.canvas.width;
+    h = ctx.canvas.height;
+  }
 
-    // 預設 offset 是中心
-    offsetX = typeof offsetX === "number" ? offsetX : 0.5;
-    offsetY = typeof offsetY === "number" ? offsetY : 0.5;
+  // 預設 offset 是中心
+  offsetX = typeof offsetX === "number" ? offsetX : 0.5;
+  offsetY = typeof offsetY === "number" ? offsetY : 0.5;
 
-    // 限制 offset 在 [0.0, 1.0]
-    if (offsetX < 0) offsetX = 0;
-    if (offsetY < 0) offsetY = 0;
-    if (offsetX > 1) offsetX = 1;
-    if (offsetY > 1) offsetY = 1;
+  // 限制 offset 在 [0.0, 1.0]
+  if (offsetX < 0) offsetX = 0;
+  if (offsetY < 0) offsetY = 0;
+  if (offsetX > 1) offsetX = 1;
+  if (offsetY > 1) offsetY = 1;
 
-    // 計算素材的寬高
-    var iw = img.videoWidth || img.width,
-        ih = img.videoHeight || img.height,
-        // 計算縮放比例
-        r = Math.min(w / iw, h / ih),
-        nw = iw * r,   // 新寬度
-        nh = ih * r,   // 新高度
-        cx, cy, cw, ch, ar = 1;
+  // 計算素材的寬高
+  var iw = img.videoWidth || img.width,
+    ih = img.videoHeight || img.height,
+    // 計算縮放比例
+    r = Math.min(w / iw, h / ih),
+    nw = iw * r,   // 新寬度
+    nh = ih * r,   // 新高度
+    cx, cy, cw, ch, ar = 1;
 
-    // 檢查是否有填滿，如果有空白，則以容器寬高為基準填滿
-    // 如果新的高度比容器高度小，計算縮放比例(ar)
-    if (nw < w) ar = w / nw;                             
-    if (Math.abs(ar - 1) < 1e-14 && nh < h) ar = h / nh;
-    nw *= ar;
-    nh *= ar;
+  // 檢查是否有填滿，如果有空白，則以容器寬高為基準填滿
+  // 如果新的高度比容器高度小，計算縮放比例(ar)
+  if (nw < w) ar = w / nw;
+  if (Math.abs(ar - 1) < 1e-14 && nh < h) ar = h / nh;
+  nw *= ar;
+  nh *= ar;
 
-    // 計算裁切部分
-    cw = iw / (nw / w);
-    ch = ih / (nh / h);
+  // 計算裁切部分
+  cw = iw / (nw / w);
+  ch = ih / (nh / h);
 
-    cx = (iw - cw) * offsetX;
-    cy = (ih - ch) * offsetY;
+  cx = (iw - cw) * offsetX;
+  cy = (ih - ch) * offsetY;
 
-    // 確保 source rectangle 是有效的
-    if (cx < 0) cx = 0;
-    if (cy < 0) cy = 0;
-    if (cw > iw) cw = iw;
-    if (ch > ih) ch = ih;
+  // 確保 source rectangle 是有效的
+  if (cx < 0) cx = 0;
+  if (cy < 0) cy = 0;
+  if (cw > iw) cw = iw;
+  if (ch > ih) ch = ih;
 
-    // 把裁切後的素材畫到 canvas 上
-    ctx.drawImage(img, cx, cy, cw, ch,  x, y, w, h);
+  // 把裁切後的素材畫到 canvas 上
+  ctx.drawImage(img, cx, cy, cw, ch, x, y, w, h);
 }
 // 包含影片的預覽跟下載
 async function GetFinalVideo(isDownload = true) {
@@ -218,13 +218,13 @@ async function GetFinalVideo(isDownload = true) {
     } else if (PictureSize.value === '16x9') {
       height = Math.round(1080 * 9 / 16);
     }
-    
+
     const container = document.querySelector('#imagePreview');
     // 使用 html2canvas 去抓取靜態圖片，品質跟單傳的圖片預覽相同
     const staticCanvas = await html2canvas(container, {
       useCORS: true,
       allowTaint: true,
-      scale: 3, 
+      scale: 3,
       backgroundColor: '#ffffff',
       dpi: 300
     });
@@ -233,7 +233,7 @@ async function GetFinalVideo(isDownload = true) {
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
-    
+
     // 處理影片元素
     const videoItems = TempImg.value.map((file, index) => {
       if (file.type === 'video') {
@@ -243,17 +243,17 @@ async function GetFinalVideo(isDownload = true) {
     }).filter(item => item !== null);
 
     const stream = canvas.captureStream(60); // 增加 FPS 以使影片更流暢
-    
+
     // 確保 AudioContext 正在運行
     if (audioCtx.state === 'suspended') {
       await audioCtx.resume();
     }
 
-  // 處理音訊相關
+    // 處理音訊相關
     const dest = audioCtx.createMediaStreamDestination();
     let hasAudio = false;
     const connectedSources = [];
-    
+
     // 逐一把影片連接到 AudioContext
     videoItems.forEach(item => {
       if (item.el) {
@@ -308,7 +308,7 @@ async function GetFinalVideo(isDownload = true) {
     // 建立影片錄製機，來源包含影片 + 音訊(stream)
     const recorder = new MediaRecorder(stream, {
       mimeType: selectedMimeType,
-      videoBitsPerSecond: 8000000 
+      videoBitsPerSecond: 8000000
     });
 
     // 建立暫存資料的陣列
@@ -332,7 +332,7 @@ async function GetFinalVideo(isDownload = true) {
       const url = URL.createObjectURL(blob);
 
       if (isDownload) {
-      // 下載模式
+        // 下載模式
         const link = document.createElement('a');
         link.href = url;
         link.download = `final-video-${Date.now()}.${ext}`;
@@ -373,7 +373,7 @@ async function GetFinalVideo(isDownload = true) {
         recorder.stop();
         return;
       }
-      
+
       // 畫靜態背景 (圖片)
       ctx.drawImage(backgroundCanvas, 0, 0);
 
@@ -382,22 +382,22 @@ async function GetFinalVideo(isDownload = true) {
         const i = item.index;
         // 根據索引和 PictureToggle 計算位置
         let x = 0, y = 0, w = 0, h = 0;
-        
+
         if (PictureToggle.value == '2') {
-           w = width / 2;
-           h = height;
-           x = i * w;
-           y = 0;
+          w = width / 2;
+          h = height;
+          x = i * w;
+          y = 0;
         } else if (PictureToggle.value == '3') {
-           w = width / 3;
-           h = height;
-           x = i * w;
-           y = 0;
+          w = width / 3;
+          h = height;
+          x = i * w;
+          y = 0;
         } else if (PictureToggle.value == '4') {
-           w = width / 2;
-           h = height / 2;
-           x = (i % 2) * w;
-           y = Math.floor(i / 2) * h;
+          w = width / 2;
+          h = height / 2;
+          x = (i % 2) * w;
+          y = Math.floor(i / 2) * h;
         }
 
         // 畫影片
@@ -407,7 +407,7 @@ async function GetFinalVideo(isDownload = true) {
       // 以瀏覽器的更新頻率進行呼叫
       requestAnimationFrame(draw);
     }
-    
+
     draw();
 
   } catch (e) {
@@ -445,6 +445,9 @@ watch(PictureSize, async () => {
     ResetCrop()
   })
 })
+
+// 模式-直
+const ImgMode = ref('straight');
 </script>
 
 <template>
@@ -471,12 +474,25 @@ watch(PictureSize, async () => {
     <div class="w-11/12 lg:w-1/3 mx-auto my-4">
       <h2 class="text-center text-lg font-bold">４、組合圖片</h2>
       <div v-if="PictureToggle == '2'">
+        <v-btn-toggle v-model="ImgMode" class="mx-auto my-4 w-full justify-center" mandatory>
+          <v-btn value="straight">直</v-btn>
+          <v-btn value="horizontal">橫</v-btn>
+        </v-btn-toggle>
         <div
           :class="['imgContainer mx-auto', { 'squareOutside': PictureSize == '1x1', 'defaultOutside': PictureSize == '4x5', 'horizontalOutside': PictureSize == '16x9' }]">
           <div id="imagePreview"
             :class="['w-full flex flex-wrap justify-start items-start', { 'square': PictureSize == '1x1', 'default': PictureSize == '4x5', 'horizontal': PictureSize == '16x9' }]">
             <template v-for="(file, index) in TempImg" :key="index">
-              <div style="width: 50%; height: 100%; position: relative; overflow: hidden;">
+              <div style="width: 50%; height: 100%; position: relative; overflow: hidden;" v-if="ImgMode == 'straight'">
+                <VueCropper v-if="file.type === 'image'" :img="file.content" :outputSize="1" outputType="jpeg"
+                  :autoCrop="false" :autoCropWidth="540" :autoCropHeight="1350" :canMoveBox="true" :canMove="true"
+                  :fixedBox="false" :centerBox="false" :ref="el => cropper[index] = el" :info="false" mode="cover"
+                  :fillColor="'black'" />
+                <video v-else-if="file.type === 'video'" :src="file.content" :ref="el => videoRefs[index] = el"
+                  style="width: 100%; height: 100%; object-fit: cover;" muted autoplay loop playsinline></video>
+              </div>
+              <div style="width: 100%; height: 50%; position: relative; overflow: hidden;"
+                v-else-if="ImgMode == 'horizontal'">
                 <VueCropper v-if="file.type === 'image'" :img="file.content" :outputSize="1" outputType="jpeg"
                   :autoCrop="false" :autoCropWidth="540" :autoCropHeight="1350" :canMoveBox="true" :canMove="true"
                   :fixedBox="false" :centerBox="false" :ref="el => cropper[index] = el" :info="false" mode="cover"
@@ -489,12 +505,25 @@ watch(PictureSize, async () => {
         </div>
       </div>
       <div v-if="PictureToggle == '3'">
+        <v-btn-toggle v-model="ImgMode" class="mx-auto my-4 w-full justify-center" mandatory>
+          <v-btn value="straight">直</v-btn>
+          <v-btn value="horizontal">橫</v-btn>
+        </v-btn-toggle>
         <div
           :class="['imgContainer mx-auto', { 'squareOutside': PictureSize == '1x1', 'defaultOutside': PictureSize == '4x5', 'horizontalOutside': PictureSize == '16x9' }]">
           <div id="imagePreview"
             :class="['w-full flex flex-wrap justify-start items-start', { 'square': PictureSize == '1x1', 'default': PictureSize == '4x5', 'horizontal': PictureSize == '16x9' }]">
             <template v-for="(file, index) in TempImg" :key="index">
-              <div style="width: 33.33%; height: 100%; position: relative; overflow: hidden;">
+              <div style="width: 33.33%; height: 100%; position: relative; overflow: hidden;"
+                v-if="ImgMode == 'straight'">
+                <VueCropper v-if="file.type === 'image'" :img="file.content" :outputSize="1" outputType="jpeg"
+                  :autoCrop="false" :autoCropWidth="360" :autoCropHeight="606" :canMoveBox="true" :canMove="true"
+                  :fixedBox="false" :centerBox="false" :ref="el => cropper[index] = el" :info="false" mode="cover" />
+                <video v-else-if="file.type === 'video'" :src="file.content" :ref="el => videoRefs[index] = el"
+                  style="width: 100%; height: 100%; object-fit: cover;" muted autoplay loop playsinline></video>
+              </div>
+              <div style="width: 100%; height: 33.33%; position: relative; overflow: hidden;"
+                v-else-if="ImgMode == 'horizontal'">
                 <VueCropper v-if="file.type === 'image'" :img="file.content" :outputSize="1" outputType="jpeg"
                   :autoCrop="false" :autoCropWidth="360" :autoCropHeight="606" :canMoveBox="true" :canMove="true"
                   :fixedBox="false" :centerBox="false" :ref="el => cropper[index] = el" :info="false" mode="cover" />
@@ -534,7 +563,7 @@ watch(PictureSize, async () => {
       <div id="finalPreview"></div>
       <!-- <img :src="imgData" alt="" /> -->
     </div>
-  <LoadingPage :loadingValue="Loading" />
+    <LoadingPage :loadingValue="Loading" />
   </div>
 </template>
 
