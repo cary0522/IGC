@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://cary0522.github.io/IGC/sitemap.xml
