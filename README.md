@@ -68,9 +68,11 @@ npm run format
 
 ```
 IGC/
-├── public/                # 靜態資源
-│   ├── favicon.ico        # 網站圖標
-│   └── Loading.gif        # 載入動畫
+├── public/
+│   ├── images/            # 靜態圖片
+│   │   ├── IGC.png        # 網站 Logo
+│   │   └── loading.gif    # 載入動畫
+│   └── favicon.ico        # 網站圖標
 ├── src/
 │   ├── views/             # 頁面視圖
 │   │   └── MainView.vue   # 主要功能頁面（圖片編輯）
