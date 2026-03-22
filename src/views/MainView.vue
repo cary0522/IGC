@@ -436,13 +436,11 @@ watch(PictureToggle, async () => {
     } else {
       TempImg.value = fileInput.value;
     }
-    ResetCrop()
   })
 })
 watch(PictureSize, async () => {
   await nextTick().then(() => {
     PictureToggle.value = "2"
-    ResetCrop()
   })
 })
 
@@ -556,7 +554,6 @@ const ImgMode = ref('straight');
       <h2 class="my-2 text-center text-lg font-bold w-full">５、點擊「下載」可儲存至「檔案」<br> 點擊「預覽」可以查看組合好的圖片</h2>
       <v-btn @click="Download" class="mx-2">下載</v-btn>
       <v-btn @click="ReviewImg" class="mx-2">預覽</v-btn>
-      <!-- <v-btn @click="ResetCrop" class="mx-2">重置</v-btn> -->
     </div>
     <div class="my-4 w-11/12 lg:w-1/3 max-w-[1080px] mx-auto">
       <h2 class="text-center text-lg font-bold">長按下方圖片可以儲存到相簿</h2>
