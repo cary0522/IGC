@@ -26,6 +26,9 @@ const TempImg = ref([]);
 const hasVideo = computed(() => TempImg.value.some(f => f.type === 'video'));
 // 預覽的素材資料
 const imgData = ref('');
+const finalPreviewUrl = ref('');
+const finalPreviewType = ref(''); // 'image' 或 'video'
+
 
 // 上傳素材，可以包含圖片跟影片
 function fileUpload(event) {
@@ -118,15 +121,10 @@ function ReviewImg() {
         });
       }
     }).then((canvas) => {
-      imgData.value = canvas.toDataURL('image/jpeg', 1.0);
-      const target = document.querySelector('#finalPreview');
-      if (target) {
-        target.innerHTML = '';
-        target.appendChild(canvas);
-        // Make sure the canvas fits the container if needed, or let CSS handle it
-        canvas.style.width = '100%';
-        canvas.style.height = 'auto';
-      }
+      const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
+      finalPreviewUrl.value = dataUrl;
+      finalPreviewType.value = 'image';
+      imgData.value = dataUrl;
       Loading.value = false;
     });
   }
@@ -205,9 +203,11 @@ function drawImageProp(ctx, img, x, y, w, h, offsetX, offsetY) {
 }
 // 包含影片的預覽跟下載
 async function GetFinalVideo(isDownload = true) {
+  if (Loading.value) return; // 防止重複點擊
   Loading.value = true;
+
   try {
-    // Set high resolution based on PictureSize
+    // 根據使用者選擇的 PictureSize 設定寬高
     let width = 1080;
     let height = 1080;
 
@@ -217,7 +217,43 @@ async function GetFinalVideo(isDownload = true) {
       height = 1350;
     } else if (PictureSize.value === '16x9') {
       height = Math.round(1080 * 9 / 16);
+    } else if (PictureSize.value === '9x16') {
+      height = Math.round(1080 * 16 / 9);
     }
+
+    // 處理影片元素 - 確保它們都已經載入
+    const videoItems = TempImg.value.map((file, index) => {
+      if (file.type === 'video') {
+        const el = videoRefs.value[index];
+        if (!el) return null;
+        return { type: 'video', el, index };
+      }
+      return null;
+    }).filter(item => item !== null);
+
+    // 等待影片 metadata 載入，並計算總時長
+    let maxVideoDuration = 0;
+    await Promise.all(videoItems.map(item => {
+      return new Promise((resolve) => {
+        if (item.el.readyState >= 2) {
+          maxVideoDuration = Math.max(maxVideoDuration, item.el.duration);
+          resolve();
+        } else {
+          item.el.onloadedmetadata = () => {
+            maxVideoDuration = Math.max(maxVideoDuration, item.el.duration);
+            resolve();
+          };
+          // 防止超時
+          setTimeout(resolve, 3000);
+        }
+      });
+    }));
+
+    // 動畫時長：如果有影片則以最長影片為準，但至少 5 秒，最高 15 秒（可視需求調整）
+    // 若無影片則預設 15 秒
+    const duration = videoItems.length > 0
+      ? Math.max(5000, Math.min(15000, maxVideoDuration * 1000))
+      : 15000;
 
     const container = document.querySelector('#imagePreview');
     // 使用 html2canvas 去抓取靜態圖片，品質跟單傳的圖片預覽相同
@@ -232,187 +268,164 @@ async function GetFinalVideo(isDownload = true) {
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: false }); // 關閉透明通道提升效能
 
-    // 處理影片元素
-    const videoItems = TempImg.value.map((file, index) => {
-      if (file.type === 'video') {
-        return { type: 'video', el: videoRefs.value[index], index };
-      }
-      return null;
-    }).filter(item => item !== null);
-
-    const stream = canvas.captureStream(60); // 增加 FPS 以使影片更流暢
-
-    // 確保 AudioContext 正在運行
-    if (audioCtx.state === 'suspended') {
-      await audioCtx.resume();
-    }
-
-    // 處理音訊相關
-    const dest = audioCtx.createMediaStreamDestination();
-    let hasAudio = false;
-    const connectedSources = [];
-
-    // 逐一把影片連接到 AudioContext
-    videoItems.forEach(item => {
-      if (item.el) {
-        try {
-          let source;
-          if (videoSourceMap.has(item.el)) {
-            source = videoSourceMap.get(item.el);
-          } else {
-            source = audioCtx.createMediaElementSource(item.el);
-            videoSourceMap.set(item.el, source);
-          }
-          // 把影片的音訊放入 dest
-          source.connect(dest);
-          connectedSources.push(source);
-          hasAudio = true;
-        } catch (e) {
-          console.warn('Audio context error', e);
-        }
-      }
-    });
-
-    // dest 已經包含所有音訊，如果 dest 有音訊，將音訊連接到播放工具
-    if (hasAudio) {
-      const audioTracks = dest.stream.getAudioTracks();
-      audioTracks.forEach(track => stream.addTrack(track));
-    }
-
-    // 嘗試尋找支援的格式，優先使用 MP4 (H.264) 以支援手機相簿
-    const mimeTypes = [
-      'video/mp4;codecs=avc1.42E01E,mp4a.40.2', // H.264 + AAC (Most compatible)
-      'video/mp4',
-      'video/webm;codecs=h264',
-      'video/webm;codecs=vp9',
-      'video/webm'
-    ];
-
-    let selectedMimeType = '';
-    for (const type of mimeTypes) {
-      if (MediaRecorder.isTypeSupported(type)) {
-        selectedMimeType = type;
-        break;
-      }
-    }
-
-    if (!selectedMimeType) {
-      console.warn('No supported mime type found, falling back to default');
-      selectedMimeType = 'video/webm';
-    }
-
-    console.log('Using MIME type:', selectedMimeType);
-
-    // 建立影片錄製機，來源包含影片 + 音訊(stream)
-    const recorder = new MediaRecorder(stream, {
-      mimeType: selectedMimeType,
-      videoBitsPerSecond: 8000000
-    });
-
-    // 建立暫存資料的陣列
-    const chunks = [];
-    // 影片錄製機的暫存處理邏輯
-    recorder.ondataavailable = e => chunks.push(e.data);
-    // 影片錄製機的暫停處理邏輯
-    recorder.onstop = () => {
-      // 清理: 斷開音訊來源
-      connectedSources.forEach(source => {
-        try {
-          source.disconnect(dest);
-        } catch (e) {
-          console.warn('Failed to disconnect source', e);
-        }
-      });
-
-      // Determine extension based on mime type
-      const ext = selectedMimeType.includes('mp4') ? 'mp4' : 'webm';
-      const blob = new Blob(chunks, { type: selectedMimeType });
-      const url = URL.createObjectURL(blob);
-
-      if (isDownload) {
-        // 下載模式
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `final-video-${Date.now()}.${ext}`;
-        link.click();
-      } else {
-        // 預覽模式
-        const target = document.querySelector('#finalPreview');
-        if (target) {
-          target.innerHTML = '';
-          const video = document.createElement('video');
-          video.src = url;
-          video.controls = true;
-          video.autoplay = true;
-          video.loop = true;
-          video.style.width = '100%';
-          video.style.height = 'auto';
-          target.appendChild(video);
-        }
-      }
-      Loading.value = false;
-    };
-
-    recorder.start();
-
-    // 動畫迴圈
-    const duration = 15000; // 15 seconds
-    const startTime = performance.now();
-
+    // 準備背景 Canvas 以提升繪製效率
     const backgroundCanvas = document.createElement('canvas');
     backgroundCanvas.width = width;
     backgroundCanvas.height = height;
     const bgCtx = backgroundCanvas.getContext('2d');
     bgCtx.drawImage(staticCanvas, 0, 0, width, height);
 
-    // 畫面渲染邏輯，15秒後停止
+    // 預先計算每個影片的位置與裁切參數，避免在 draw 迴圈中重跑計算
+    const videoLayouts = videoItems.map(item => {
+      const i = item.index;
+      const el = item.el;
+      let x = 0, y = 0, w = 0, h = 0;
+
+      if (PictureToggle.value == '2') {
+        w = Math.ceil(width / 2);
+        h = height;
+        x = i * Math.floor(width / 2);
+        y = 0;
+      } else if (PictureToggle.value == '3') {
+        w = Math.ceil(width / 3);
+        h = height;
+        x = i * Math.floor(width / 3);
+        y = 0;
+      } else if (PictureToggle.value == '4') {
+        w = Math.ceil(width / 2);
+        h = Math.ceil(height / 2);
+        x = (i % 2) * Math.floor(width / 2);
+        y = Math.floor(i / 2) * Math.floor(height / 2);
+      }
+
+      // 裁切邏輯 (drawImageProp 的邏輯)
+      const iw = el.videoWidth;
+      const ih = el.videoHeight;
+      const r = Math.min(w / iw, h / ih);
+      let nw = iw * r;
+      let nh = ih * r;
+      let ar = 1;
+      if (nw < w) ar = w / nw;
+      if (Math.abs(ar - 1) < 1e-14 && nh < h) ar = h / nh;
+      nw *= ar;
+      nh *= ar;
+      const cw = iw / (nw / w);
+      const ch = ih / (nh / h);
+      const cx = Math.max(0, (iw - cw) * 0.5);
+      const cy = Math.max(0, (ih - ch) * 0.5);
+
+      return { el, x, y, w, h, sx: cx, sy: cy, sw: Math.min(cw, iw), sh: Math.min(ch, ih) };
+    });
+
+    // 設定錄製參數
+    const stream = canvas.captureStream(30); // 30 FPS 對於穩定度跟檔案大小是很好的平衡
+
+    // 確保 AudioContext 正在運行
+    if (audioCtx.state === 'suspended') {
+      await audioCtx.resume();
+    }
+
+    const dest = audioCtx.createMediaStreamDestination();
+    let hasAudio = false;
+    const connectedSources = [];
+
+    videoItems.forEach(item => {
+      try {
+        let source;
+        if (videoSourceMap.has(item.el)) {
+          source = videoSourceMap.get(item.el);
+        } else {
+          source = audioCtx.createMediaElementSource(item.el);
+          videoSourceMap.set(item.el, source);
+        }
+        source.connect(dest);
+        connectedSources.push(source);
+        hasAudio = true;
+      } catch (e) {
+        console.warn('Audio context error or source already connected', e);
+      }
+    });
+
+    if (hasAudio) {
+      dest.stream.getAudioTracks().forEach(track => stream.addTrack(track));
+    }
+
+    // MIME type 選擇
+    const preferredType = 'video/mp4;codecs=avc1.42E01E,mp4a.40.2';
+    const selectedMimeType = MediaRecorder.isTypeSupported(preferredType)
+      ? preferredType
+      : 'video/webm;codecs=h264';
+
+    const recorder = new MediaRecorder(stream, {
+      mimeType: selectedMimeType,
+      videoBitsPerSecond: 6000000 // 6Mbps 足夠高品質且維持穩定
+    });
+
+    const chunks = [];
+    recorder.ondataavailable = e => {
+      if (e.data.size > 0) chunks.push(e.data);
+    };
+
+    recorder.onstop = () => {
+      // 錄製結束後的清理
+      connectedSources.forEach(source => {
+        try { source.disconnect(dest); } catch (e) { }
+      });
+
+      const blob = new Blob(chunks, { type: selectedMimeType });
+      const url = URL.createObjectURL(blob);
+      const ext = selectedMimeType.includes('mp4') ? 'mp4' : 'webm';
+
+      if (isDownload) {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `IGC-final-${Date.now()}.${ext}`;
+        link.click();
+      } else {
+        finalPreviewUrl.value = url;
+        finalPreviewType.value = 'video';
+      }
+      Loading.value = false;
+    };
+
+    // --- 同步影片並開始錄製 ---
+    // 先暫停並 seek 到開頭
+    videoItems.forEach(item => {
+      item.el.pause();
+      item.el.currentTime = 0;
+    });
+
+    // 確保所有影片都開始播放
+    await Promise.all(videoItems.map(item => item.el.play().catch(e => console.error("Play failed", e))));
+
+    recorder.start();
+    const startTime = performance.now();
+
     function draw() {
-      if (performance.now() - startTime > duration) {
+      const now = performance.now();
+      if (now - startTime > duration) {
         recorder.stop();
         return;
       }
 
-      // 畫靜態背景 (圖片)
+      // 底層背景 (預覽生成的靜態圖)
       ctx.drawImage(backgroundCanvas, 0, 0);
 
-      // 畫影片在上面
-      videoItems.forEach((item) => {
-        const i = item.index;
-        // 根據索引和 PictureToggle 計算位置
-        let x = 0, y = 0, w = 0, h = 0;
-
-        if (PictureToggle.value == '2') {
-          w = width / 2;
-          h = height;
-          x = i * w;
-          y = 0;
-        } else if (PictureToggle.value == '3') {
-          w = width / 3;
-          h = height;
-          x = i * w;
-          y = 0;
-        } else if (PictureToggle.value == '4') {
-          w = width / 2;
-          h = height / 2;
-          x = (i % 2) * w;
-          y = Math.floor(i / 2) * h;
-        }
-
-        // 畫影片
-        drawImageProp(ctx, item.el, x, y, w, h);
+      // 上層影片 (直接繪製，完全無計算)
+      videoLayouts.forEach(layout => {
+        ctx.drawImage(layout.el, layout.sx, layout.sy, layout.sw, layout.sh, layout.x, layout.y, layout.w, layout.h);
       });
 
-      // 以瀏覽器的更新頻率進行呼叫
       requestAnimationFrame(draw);
     }
 
     draw();
 
   } catch (e) {
-    console.error(e);
-    alert('Export failed: ' + e.message);
+    console.error("Export process failed:", e);
+    alert('匯出失敗：' + (e.message || '未知錯誤'));
     Loading.value = false;
   }
 }
@@ -455,13 +468,14 @@ const ImgMode = ref('straight');
       <v-btn value="1x1">正方形</v-btn>
       <v-btn value="4x5">直式</v-btn>
       <v-btn value="16x9">橫式</v-btn>
+      <v-btn value="9x16">限時動態</v-btn>
     </v-btn-toggle>
   </div>
   <div class="my-2">
     <h2 class="text-center text-lg font-bold">２、請選擇要組合幾張照片</h2>
     <v-btn-toggle v-model="PictureToggle" class="mx-auto my-4 w-full justify-center" mandatory>
       <v-btn value="2" key="PictureToggle2">兩張照片</v-btn>
-      <v-btn value="3" key="PictureToggle3" v-show="PictureSize == '16x9'">三張照片</v-btn>
+      <v-btn value="3" key="PictureToggle3" v-show="PictureSize !== '1x1'">三張照片</v-btn>
       <v-btn value="4" key="PictureToggle4" v-show="PictureSize != '16x9'">四張照片</v-btn>
     </v-btn-toggle>
     <h2 class="text-center text-lg font-bold">３、上傳圖片</h2>
@@ -477,24 +491,26 @@ const ImgMode = ref('straight');
           <v-btn value="horizontal">橫</v-btn>
         </v-btn-toggle>
         <div
-          :class="['imgContainer mx-auto', { 'squareOutside': PictureSize == '1x1', 'defaultOutside': PictureSize == '4x5', 'horizontalOutside': PictureSize == '16x9' }]">
+          :class="['imgContainer mx-auto', { 'squareOutside': PictureSize == '1x1', 'defaultOutside': PictureSize == '4x5', 'horizontalOutside': PictureSize == '16x9', 'storyOutside': PictureSize == '9x16' }]">
           <div id="imagePreview"
-            :class="['w-full flex flex-wrap justify-start items-start', { 'square': PictureSize == '1x1', 'default': PictureSize == '4x5', 'horizontal': PictureSize == '16x9' }]">
+            :class="['w-full flex flex-wrap justify-start items-start', { 'square': PictureSize == '1x1', 'default': PictureSize == '4x5', 'horizontal': PictureSize == '16x9', 'story': PictureSize == '9x16' }]">
             <template v-for="(file, index) in TempImg" :key="index">
-              <div style="width: 50%; height: 100%; position: relative; overflow: hidden;" v-if="ImgMode == 'straight'">
+              <div style="width: calc(100% / 2+ 1px); height: 100%; position: relative; overflow: hidden;"
+                v-if="ImgMode == 'straight'">
                 <VueCropper v-if="file.type === 'image'" :img="file.content" :outputSize="1" outputType="jpeg"
                   :autoCrop="false" :autoCropWidth="540" :autoCropHeight="1350" :canMoveBox="true" :canMove="true"
-                  :fixedBox="false" :centerBox="false" :ref="el => cropper[index] = el" :info="false" mode="cover"
-                  :fillColor="'black'" />
+                  :fixedBox="false" :centerBox="true" :ref="el => cropper[index] = el" :info="false" mode="cover"
+                  :fillColor="'white'" />
                 <video v-else-if="file.type === 'video'" :src="file.content" :ref="el => videoRefs[index] = el"
                   style="width: 100%; height: 100%; object-fit: cover;" muted autoplay loop playsinline></video>
               </div>
-              <div style="width: 100%; height: 50%; position: relative; overflow: hidden;"
+              <div
+                style="width: 100%; height: calc(100% / 2 + 1px); margin-bottom: -1px; position: relative; overflow: hidden;"
                 v-else-if="ImgMode == 'horizontal'">
                 <VueCropper v-if="file.type === 'image'" :img="file.content" :outputSize="1" outputType="jpeg"
                   :autoCrop="false" :autoCropWidth="540" :autoCropHeight="1350" :canMoveBox="true" :canMove="true"
-                  :fixedBox="false" :centerBox="false" :ref="el => cropper[index] = el" :info="false" mode="cover"
-                  :fillColor="'black'" />
+                  :fixedBox="false" :centerBox="true" :ref="el => cropper[index] = el" :info="false" mode="cover"
+                  :fillColor="'white'" />
                 <video v-else-if="file.type === 'video'" :src="file.content" :ref="el => videoRefs[index] = el"
                   style="width: 100%; height: 100%; object-fit: cover;" muted autoplay loop playsinline></video>
               </div>
@@ -508,23 +524,27 @@ const ImgMode = ref('straight');
           <v-btn value="horizontal">橫</v-btn>
         </v-btn-toggle>
         <div
-          :class="['imgContainer mx-auto', { 'squareOutside': PictureSize == '1x1', 'defaultOutside': PictureSize == '4x5', 'horizontalOutside': PictureSize == '16x9' }]">
+          :class="['imgContainer mx-auto', { 'squareOutside': PictureSize == '1x1', 'defaultOutside': PictureSize == '4x5', 'horizontalOutside': PictureSize == '16x9', 'storyOutside': PictureSize == '9x16' }]">
           <div id="imagePreview"
-            :class="['w-full flex flex-wrap justify-start items-start', { 'square': PictureSize == '1x1', 'default': PictureSize == '4x5', 'horizontal': PictureSize == '16x9' }]">
+            :class="['w-full flex flex-wrap justify-start items-start', { 'square': PictureSize == '1x1', 'default': PictureSize == '4x5', 'horizontal': PictureSize == '16x9', 'story': PictureSize == '9x16' }]">
             <template v-for="(file, index) in TempImg" :key="index">
-              <div style="width: 33.33%; height: 100%; position: relative; overflow: hidden;"
+              <div
+                style="width: calc(100% / 3 + 1px); margin-right: -1px; height: 100%; position: relative; overflow: hidden;"
                 v-if="ImgMode == 'straight'">
                 <VueCropper v-if="file.type === 'image'" :img="file.content" :outputSize="1" outputType="jpeg"
                   :autoCrop="false" :autoCropWidth="360" :autoCropHeight="606" :canMoveBox="true" :canMove="true"
-                  :fixedBox="false" :centerBox="false" :ref="el => cropper[index] = el" :info="false" mode="cover" />
+                  :fixedBox="false" :centerBox="true" :ref="el => cropper[index] = el" :info="false" mode="cover"
+                  :fillColor="'white'" />
                 <video v-else-if="file.type === 'video'" :src="file.content" :ref="el => videoRefs[index] = el"
                   style="width: 100%; height: 100%; object-fit: cover;" muted autoplay loop playsinline></video>
               </div>
-              <div style="width: 100%; height: 33.33%; position: relative; overflow: hidden;"
+              <div
+                style="width: 100%; height: calc(100% / 3 + 1px); margin-bottom: -1px; position: relative; overflow: hidden;"
                 v-else-if="ImgMode == 'horizontal'">
                 <VueCropper v-if="file.type === 'image'" :img="file.content" :outputSize="1" outputType="jpeg"
                   :autoCrop="false" :autoCropWidth="360" :autoCropHeight="606" :canMoveBox="true" :canMove="true"
-                  :fixedBox="false" :centerBox="false" :ref="el => cropper[index] = el" :info="false" mode="cover" />
+                  :fixedBox="false" :centerBox="true" :ref="el => cropper[index] = el" :info="false" mode="cover"
+                  :fillColor="'white'" />
                 <video v-else-if="file.type === 'video'" :src="file.content" :ref="el => videoRefs[index] = el"
                   style="width: 100%; height: 100%; object-fit: cover;" muted autoplay loop playsinline></video>
               </div>
@@ -534,14 +554,16 @@ const ImgMode = ref('straight');
       </div>
       <div v-if="PictureToggle == '4'">
         <div
-          :class="['imgContainer mx-auto', { 'squareOutside': PictureSize == '1x1', 'defaultOutside': PictureSize == '4x5', 'horizontalOutside': PictureSize == '16x9' }]">
+          :class="['imgContainer mx-auto', { 'squareOutside': PictureSize == '1x1', 'defaultOutside': PictureSize == '4x5', 'horizontalOutside': PictureSize == '16x9', 'storyOutside': PictureSize == '9x16' }]">
           <div id="imagePreview"
-            :class="['w-full flex flex-wrap justify-start items-start', { 'square': PictureSize == '1x1', 'default': PictureSize == '4x5', 'horizontal': PictureSize == '16x9' }]">
+            :class="['w-full flex flex-wrap justify-start items-start', { 'square': PictureSize == '1x1', 'default': PictureSize == '4x5', 'horizontal': PictureSize == '16x9', 'story': PictureSize == '9x16' }]">
             <template v-for="(file, index) in TempImg" :key="index">
-              <div style="width: 50%; height: 50%; position: relative; overflow: hidden;">
+              <div
+                style="width: calc(100% / 2 + 1px); height: calc(100% / 2 + 1px); margin-right: -1px; margin-bottom: -1px; position: relative; overflow: hidden; background: black;">
                 <VueCropper v-if="file.type === 'image'" :img="file.content" :outputSize="1" outputType="jpeg"
                   :autoCrop="false" :autoCropWidth="540" :autoCropHeight="675" :canMoveBox="true" :canMove="true"
-                  :fixedBox="false" :centerBox="false" :ref="el => cropper[index] = el" :info="false" mode="cover" />
+                  :fixedBox="false" :centerBox="true" :ref="el => cropper[index] = el" :info="false" mode="cover"
+                  :fillColor="'white'" />
                 <video v-else-if="file.type === 'video'" :src="file.content" :ref="el => videoRefs[index] = el"
                   style="width: 100%; height: 100%; object-fit: cover;" muted autoplay loop playsinline></video>
               </div>
@@ -555,11 +577,21 @@ const ImgMode = ref('straight');
       <v-btn @click="Download" class="mx-2">下載</v-btn>
       <v-btn @click="ReviewImg" class="mx-2">預覽</v-btn>
     </div>
-    <div class="my-4 w-11/12 lg:w-1/3 max-w-[1080px] mx-auto">
-      <h2 class="text-center text-lg font-bold">長按下方圖片可以儲存到相簿</h2>
-      <div id="finalPreview"></div>
-      <!-- <img :src="imgData" alt="" /> -->
+    <div class="my-4 w-11/12 lg:w-1/3 max-w-[1080px] mx-auto" v-if="finalPreviewUrl">
+      <h2 class="text-center text-lg font-bold">
+        {{ finalPreviewType === 'image' ? '長按下方圖片可以儲存到相簿' : '預覽組合好的結果，點擊「下載」儲存至「檔案」' }}
+      </h2>
+      <div id="finalPreview" class="mt-4">
+        <!-- 圖片預覽：使用 img 標籤（支援手機長按儲存） -->
+        <img v-if="finalPreviewType === 'image'" :src="finalPreviewUrl" alt="Final Preview"
+          class="w-full h-auto shadow-lg mx-auto" />
+
+        <!-- 影片預覽：使用 video 標籤 -->
+        <video v-else-if="finalPreviewType === 'video'" :src="finalPreviewUrl" controls autoplay loop playsinline
+          class="w-full h-auto shadow-lg mx-auto"></video>
+      </div>
     </div>
+    <!-- 讀取畫面 -->
     <LoadingPage :loadingValue="Loading" />
   </div>
 </template>
@@ -600,5 +632,16 @@ const ImgMode = ref('straight');
   max-width: 1080px;
   max-height: 1350px;
   aspect-ratio: 4 / 5;
+}
+
+.storyOutside {
+  max-width: 1082px;
+  max-height: 1922px;
+}
+
+.story {
+  max-width: 1080px;
+  max-height: 1920px;
+  aspect-ratio: 9 / 16;
 }
 </style>
