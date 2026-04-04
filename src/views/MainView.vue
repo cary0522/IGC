@@ -495,7 +495,7 @@ const ImgMode = ref('straight');
           <div id="imagePreview"
             :class="['w-full flex flex-wrap justify-start items-start', { 'square': PictureSize == '1x1', 'default': PictureSize == '4x5', 'horizontal': PictureSize == '16x9', 'story': PictureSize == '9x16' }]">
             <template v-for="(file, index) in TempImg" :key="index">
-              <div style="width: calc(100% / 2+ 1px); height: 100%; position: relative; overflow: hidden;"
+              <div style="width: calc(100% / 2 + 1px); margin-right: -1px; height: 100%; position: relative; overflow: hidden;"
                 v-if="ImgMode == 'straight'">
                 <VueCropper v-if="file.type === 'image'" :img="file.content" :outputSize="1" outputType="jpeg"
                   :autoCrop="false" :autoCropWidth="540" :autoCropHeight="1350" :canMoveBox="true" :canMove="true"
