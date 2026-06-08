@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, nextTick, computed } from 'vue';
+import { ref, watch, nextTick, computed, onBeforeUnmount } from 'vue';
 import { VueCropper } from "vue-cropper";
 import "vue-cropper/dist/index.css";
 import html2canvas from 'html2canvas';
@@ -13,10 +13,17 @@ const PictureToggle = ref(2);
 const cropper = ref([]);
 const videoRefs = ref([]);
 
-
 // 使用 web api 內建的影片播放器
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+// 延遲初始化：AudioContext 必須在使用者互動後才能建立（iOS Safari 限制）
+let audioCtx = null;
 const videoSourceMap = new WeakMap();
+
+function getAudioContext() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return audioCtx;
+}
 
 // 上傳的素材資料
 const fileInput = ref([]);
@@ -29,53 +36,134 @@ const imgData = ref('');
 const finalPreviewUrl = ref('');
 const finalPreviewType = ref(''); // 'image' 或 'video'
 
+// --- 效能優化輔助函式 ---
+
+// 優化項目 1: 圖片上傳後先壓縮再進入 VueCropper
+async function compressImageFile(file, maxWidth = 1600, quality = 0.85) {
+  try {
+    // 優先使用效能較好的 createImageBitmap
+    const bitmap = await createImageBitmap(file);
+    return await renderToBlob(bitmap, maxWidth, quality);
+  } catch (e) {
+    console.warn("createImageBitmap failed, trying Image element fallback", e);
+    // Fallback: 如果系統資源緊張導致 bitmap 失敗，使用傳統 Image 物件
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = async () => {
+        const result = await renderToBlob(img, maxWidth, quality);
+        URL.revokeObjectURL(url);
+        resolve(result);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        // 最後手段才回傳原始 URL
+        const fallbackUrl = URL.createObjectURL(file);
+        resolve({ type: 'image', content: fallbackUrl, objectUrl: fallbackUrl });
+      };
+      img.src = url;
+    });
+  }
+}
+
+// 輔助函式：將來源畫到 Canvas 並輸出 Blob
+async function renderToBlob(source, maxWidth, quality) {
+  let width = source.width || source.videoWidth;
+  let height = source.height || source.videoHeight;
+
+  if (width > maxWidth) {
+    height = (maxWidth / width) * height;
+    width = maxWidth;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(source, 0, 0, width, height);
+
+  // 如果是 ImageBitmap 則關閉以釋放資源
+  if (source.close) source.close();
+
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => {
+      const objectUrl = URL.createObjectURL(blob);
+      // 關鍵優化：手動清空 Canvas 寬高，提示瀏覽器立即釋放繪圖快取
+      canvas.width = 0;
+      canvas.height = 0;
+      resolve({
+        type: 'image',
+        content: objectUrl,
+        objectUrl
+      });
+    }, 'image/jpeg', quality);
+  });
+}
+
+// 優化項目 3: 統一管理與釋放 Object URL
+function setFinalPreviewUrl(url, type) {
+  if (finalPreviewUrl.value && finalPreviewUrl.value.startsWith('blob:')) {
+    URL.revokeObjectURL(finalPreviewUrl.value);
+  }
+  finalPreviewUrl.value = url;
+  finalPreviewType.value = type;
+}
 
 // 上傳素材，可以包含圖片跟影片
-function fileUpload(event) {
-  if (PictureToggle.value == '2' && event.target.files.length > '2') {
-    alert('只能上傳兩張照片');
+async function fileUpload(event) {
+  const files = Array.from(event.target.files);
+  if (!files.length) return;
+
+  // 針對所有 PictureToggle 值都做上傳數量限制
+  if (files.length > PictureToggle.value) {
+    alert(`最多只能上傳 ${PictureToggle.value} 張照片/影片`);
     return;
-  } else if (PictureToggle.value == '3' && event.target.files.length > '3') {
-    alert('只能上傳三張照片');
-    return;
-  } else if (PictureToggle.value == '4' && event.target.files.length > '4') {
-    alert('只能上傳四張照片');
-    return;
-  } else if (fileInput.value.length + event.target.files.length <= PictureToggle.value) {
-    // 照片不滿選擇張數
-    for (let i = 0; i < event.target.files.length; i++) {
-      const file = event.target.files[i];
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          fileInput.value.push({ type: 'image', content: e.target.result });
-        };
-        reader.readAsDataURL(file);
-      } else if (file.type.startsWith('video/')) {
-        const url = URL.createObjectURL(file);
-        fileInput.value.push({ type: 'video', content: url });
-      }
-    }
-    TempImg.value = fileInput.value;
-  } else {
-    // 照片剛好符合選擇張數
-    // 清空原本儲存的圖片資料
+  }
+
+  // 決定是累加還是覆蓋
+  const isAppend = fileInput.value.length + files.length <= PictureToggle.value;
+
+  // 只有在「完整覆蓋」時才撤銷舊 URL
+  if (!isAppend) {
+    fileInput.value.forEach(f => {
+      if (f.objectUrl) URL.revokeObjectURL(f.objectUrl);
+    });
     fileInput.value = [];
     TempImg.value = [];
-    for (let i = 0; i < event.target.files.length; i++) {
-      const file = event.target.files[i];
+  }
+
+  Loading.value = true;
+  try {
+    // 獲取目前的素材清單（若是覆蓋模式則為空陣列）
+    const currentList = isAppend ? [...fileInput.value] : [];
+
+    for (const file of files) {
+      // 檢查是否已達上限
+      if (currentList.length >= PictureToggle.value) break;
+
+      let processedItem = null;
       if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          fileInput.value.push({ type: 'image', content: e.target.result });
-        };
-        reader.readAsDataURL(file);
+        processedItem = await compressImageFile(file);
       } else if (file.type.startsWith('video/')) {
-        const url = URL.createObjectURL(file);
-        fileInput.value.push({ type: 'video', content: url });
+        const objectUrl = URL.createObjectURL(file);
+        processedItem = { type: 'video', content: objectUrl, objectUrl };
+      }
+
+      if (processedItem) {
+        currentList.push(processedItem);
+        // 優化核心：每處理完一張就更新一次渲染，並暫停一下讓瀏覽器喘口氣
+        // 這能避免一次掛載 10 個 VueCropper 造成記憶體噴發
+        fileInput.value = [...currentList];
+        TempImg.value = [...currentList];
+
+        // 暫停 150ms 給瀏覽器執行垃圾回收與畫面渲染
+        await new Promise(resolve => setTimeout(resolve, 150));
       }
     }
-    TempImg.value = fileInput.value;
+  } catch (err) {
+    console.error("Upload process failed", err);
+  } finally {
+    Loading.value = false;
   }
 }
 
@@ -121,11 +209,13 @@ function ReviewImg() {
         });
       }
     }).then((canvas) => {
-      const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
-      finalPreviewUrl.value = dataUrl;
-      finalPreviewType.value = 'image';
-      imgData.value = dataUrl;
-      Loading.value = false;
+      // 優化項目 2: 圖片預覽改用 Blob
+      canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        setFinalPreviewUrl(url, 'image');
+        imgData.value = url;
+        Loading.value = false;
+      }, 'image/jpeg', 0.9);
     });
   }
 }
@@ -322,7 +412,8 @@ async function GetFinalVideo(isDownload = true) {
     // 設定錄製參數
     const stream = canvas.captureStream(30); // 30 FPS 對於穩定度跟檔案大小是很好的平衡
 
-    // 確保 AudioContext 正在運行
+    // 確保 AudioContext 正在運行（在使用者互動後才初始化）
+    const audioCtx = getAudioContext();
     if (audioCtx.state === 'suspended') {
       await audioCtx.resume();
     }
@@ -369,12 +460,22 @@ async function GetFinalVideo(isDownload = true) {
     };
 
     recorder.onstop = () => {
-      // 錄製結束後的清理
+      // 優化項目 4: MediaRecorder 完成後完整清理資源
       connectedSources.forEach(source => {
-        try { source.disconnect(dest); } catch (e) { }
+        try { source.disconnect(); } catch (e) { }
+      });
+      connectedSources.length = 0;
+
+      // 停止所有 Track
+      stream.getTracks().forEach(track => track.stop());
+
+      // 停止影片
+      videoItems.forEach(item => {
+        if (item.el) item.el.pause();
       });
 
       const blob = new Blob(chunks, { type: selectedMimeType });
+      chunks.length = 0; // 清空 chunks
       const url = URL.createObjectURL(blob);
       const ext = selectedMimeType.includes('mp4') ? 'mp4' : 'webm';
 
@@ -383,9 +484,10 @@ async function GetFinalVideo(isDownload = true) {
         link.href = url;
         link.download = `IGC-final-${Date.now()}.${ext}`;
         link.click();
+        // 下載用的 Blob URL 建議在一段時間後釋放，避免累積
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
       } else {
-        finalPreviewUrl.value = url;
-        finalPreviewType.value = 'video';
+        setFinalPreviewUrl(url, 'video');
       }
       Loading.value = false;
     };
@@ -459,6 +561,16 @@ watch(PictureSize, async () => {
 
 // 模式-直
 const ImgMode = ref('straight');
+
+// 額外需求: 元件卸載時釋放資源
+onBeforeUnmount(() => {
+  fileInput.value.forEach(f => {
+    if (f.objectUrl) URL.revokeObjectURL(f.objectUrl);
+  });
+  if (finalPreviewUrl.value && finalPreviewUrl.value.startsWith('blob:')) {
+    URL.revokeObjectURL(finalPreviewUrl.value);
+  }
+});
 </script>
 
 <template>
