@@ -8,7 +8,7 @@ import LoadingPage from './LoadingPage.vue'
 const Loading = ref(false);
 
 const PictureSize = ref('4x5');
-const PictureToggle = ref("2");
+const PictureToggle = ref(2);
 
 const cropper = ref([]);
 const videoRefs = ref([]);
@@ -283,17 +283,17 @@ async function GetFinalVideo(isDownload = true) {
       const el = item.el;
       let x = 0, y = 0, w = 0, h = 0;
 
-      if (PictureToggle.value == '2') {
+      if (PictureToggle.value == 2) {
         w = Math.ceil(width / 2);
         h = height;
         x = i * Math.floor(width / 2);
         y = 0;
-      } else if (PictureToggle.value == '3') {
+      } else if (PictureToggle.value == 3) {
         w = Math.ceil(width / 3);
         h = height;
         x = i * Math.floor(width / 3);
         y = 0;
-      } else if (PictureToggle.value == '4') {
+      } else if (PictureToggle.value == 4) {
         w = Math.ceil(width / 2);
         h = Math.ceil(height / 2);
         x = (i % 2) * Math.floor(width / 2);
@@ -453,7 +453,7 @@ watch(PictureToggle, async () => {
 })
 watch(PictureSize, async () => {
   await nextTick().then(() => {
-    PictureToggle.value = "2"
+    PictureToggle.value = 2
   })
 })
 
@@ -473,10 +473,17 @@ const ImgMode = ref('straight');
   </div>
   <div class="my-2">
     <h2 class="text-center text-lg font-bold">２、請選擇要組合幾張照片</h2>
-    <v-btn-toggle v-model="PictureToggle" class="mx-auto my-4 w-full justify-center" mandatory>
-      <v-btn value="2" key="PictureToggle2">兩張照片</v-btn>
-      <v-btn value="3" key="PictureToggle3" v-show="PictureSize !== '1x1'">三張照片</v-btn>
-      <v-btn value="4" key="PictureToggle4" v-show="PictureSize != '16x9'">四張照片</v-btn>
+    <v-btn-toggle v-model="PictureToggle" class="mx-auto my-4 w-full flex flex-wrap justify-center h-auto" mandatory>
+      <v-btn :value="2" class="mx-1 my-2 border px-2 py-2 rounded" key="PictureToggle2">兩張照片</v-btn>
+      <v-btn :value="3" class="mx-1 my-2 border px-2 py-2 rounded" key="PictureToggle3"
+        v-show="PictureSize !== '1x1'">三張照片</v-btn>
+      <v-btn :value="4" class="mx-1 my-2 border px-2 py-2 rounded" key="PictureToggle4"
+        v-show="PictureSize != '16x9'">四張照片</v-btn>
+      <v-btn :value="6" class="mx-1 my-2 border px-2 py-2 rounded" key="PictureToggle6"
+        v-show="PictureSize == '16x9'">六張照片</v-btn>
+      <v-btn :value="9" class="mx-1 my-2 border px-2 py-2 rounded" key="PictureToggle9">九張照片</v-btn>
+      <v-btn :value="10" class="mx-1 my-2 border px-2 py-2 rounded" key="PictureToggle10"
+        v-show="PictureSize == '16x9'">十張照片</v-btn>
     </v-btn-toggle>
     <h2 class="text-center text-lg font-bold">３、上傳圖片</h2>
     <v-file-input label="上傳照片" :hide-input="true" placeholder="上傳照片" prepend-icon="mdi-image" type="file"
@@ -485,32 +492,19 @@ const ImgMode = ref('straight');
   <div class="w-full lg:flex justify-center items-start">
     <div class="w-11/12 lg:w-1/3 mx-auto my-4">
       <h2 class="text-center text-lg font-bold">４、組合圖片</h2>
-      <div v-if="PictureToggle == '2'">
-        <v-btn-toggle v-model="ImgMode" class="mx-auto my-4 w-full justify-center" mandatory>
-          <v-btn value="straight">直</v-btn>
-          <v-btn value="horizontal">橫</v-btn>
-        </v-btn-toggle>
+
+      <div v-if="PictureToggle === 4 || PictureToggle === 9">
         <div
           :class="['imgContainer mx-auto', { 'squareOutside': PictureSize == '1x1', 'defaultOutside': PictureSize == '4x5', 'horizontalOutside': PictureSize == '16x9', 'storyOutside': PictureSize == '9x16' }]">
           <div id="imagePreview"
             :class="['w-full flex flex-wrap justify-start items-start', { 'square': PictureSize == '1x1', 'default': PictureSize == '4x5', 'horizontal': PictureSize == '16x9', 'story': PictureSize == '9x16' }]">
             <template v-for="(file, index) in TempImg" :key="index">
-              <div style="width: calc(100% / 2 + 1px); margin-right: -1px; height: 100%; position: relative; overflow: hidden;"
-                v-if="ImgMode == 'straight'">
-                <VueCropper v-if="file.type === 'image'" :img="file.content" :outputSize="1" outputType="jpeg"
-                  :autoCrop="false" :autoCropWidth="540" :autoCropHeight="1350" :canMoveBox="true" :canMove="true"
-                  :fixedBox="false" :centerBox="true" :ref="el => cropper[index] = el" :info="false" mode="cover"
-                  :fillColor="'white'" />
-                <video v-else-if="file.type === 'video'" :src="file.content" :ref="el => videoRefs[index] = el"
-                  style="width: 100%; height: 100%; object-fit: cover;" muted autoplay loop playsinline></video>
-              </div>
               <div
-                style="width: 100%; height: calc(100% / 2 + 1px); margin-bottom: -1px; position: relative; overflow: hidden;"
-                v-else-if="ImgMode == 'horizontal'">
+                :style="`width: calc(100% / ${Math.sqrt(PictureToggle)} + 1px); height: calc(100% / ${Math.sqrt(PictureToggle)} + 1px); margin-right: -1px; margin-bottom: -1px; position: relative; overflow: hidden; background: black;`">
                 <VueCropper v-if="file.type === 'image'" :img="file.content" :outputSize="1" outputType="jpeg"
-                  :autoCrop="false" :autoCropWidth="540" :autoCropHeight="1350" :canMoveBox="true" :canMove="true"
-                  :fixedBox="false" :centerBox="true" :ref="el => cropper[index] = el" :info="false" mode="cover"
-                  :fillColor="'white'" />
+                  :autoCrop="false" :autoCropWidth="1080 / Math.sqrt(PictureToggle)"
+                  :autoCropHeight="1350 / Math.sqrt(PictureToggle)" :canMoveBox="true" :canMove="true" :fixedBox="false"
+                  :centerBox="true" :ref="el => cropper[index] = el" :info="false" mode="cover" :fillColor="'white'" />
                 <video v-else-if="file.type === 'video'" :src="file.content" :ref="el => videoRefs[index] = el"
                   style="width: 100%; height: 100%; object-fit: cover;" muted autoplay loop playsinline></video>
               </div>
@@ -518,7 +512,8 @@ const ImgMode = ref('straight');
           </div>
         </div>
       </div>
-      <div v-if="PictureToggle == '3'">
+
+      <div v-else-if="PictureToggle <= 3">
         <v-btn-toggle v-model="ImgMode" class="mx-auto my-4 w-full justify-center" mandatory>
           <v-btn value="straight">直</v-btn>
           <v-btn value="horizontal">橫</v-btn>
@@ -529,22 +524,22 @@ const ImgMode = ref('straight');
             :class="['w-full flex flex-wrap justify-start items-start', { 'square': PictureSize == '1x1', 'default': PictureSize == '4x5', 'horizontal': PictureSize == '16x9', 'story': PictureSize == '9x16' }]">
             <template v-for="(file, index) in TempImg" :key="index">
               <div
-                style="width: calc(100% / 3 + 1px); margin-right: -1px; height: 100%; position: relative; overflow: hidden;"
+                :style="`width: calc(100% / ${PictureToggle} + 1px); margin-right: -1px; height: 100%; position: relative; overflow: hidden;`"
                 v-if="ImgMode == 'straight'">
                 <VueCropper v-if="file.type === 'image'" :img="file.content" :outputSize="1" outputType="jpeg"
-                  :autoCrop="false" :autoCropWidth="360" :autoCropHeight="606" :canMoveBox="true" :canMove="true"
-                  :fixedBox="false" :centerBox="true" :ref="el => cropper[index] = el" :info="false" mode="cover"
-                  :fillColor="'white'" />
+                  :autoCrop="false" :autoCropWidth="1080 / PictureToggle" :autoCropHeight="1350" :canMoveBox="true"
+                  :canMove="true" :fixedBox="false" :centerBox="true" :ref="el => cropper[index] = el" :info="false"
+                  mode="cover" :fillColor="'white'" />
                 <video v-else-if="file.type === 'video'" :src="file.content" :ref="el => videoRefs[index] = el"
                   style="width: 100%; height: 100%; object-fit: cover;" muted autoplay loop playsinline></video>
               </div>
               <div
-                style="width: 100%; height: calc(100% / 3 + 1px); margin-bottom: -1px; position: relative; overflow: hidden;"
+                :style="`width: 100%; height: calc(100% / ${PictureToggle} + 1px); margin-bottom: -1px; position: relative; overflow: hidden;`"
                 v-else-if="ImgMode == 'horizontal'">
                 <VueCropper v-if="file.type === 'image'" :img="file.content" :outputSize="1" outputType="jpeg"
-                  :autoCrop="false" :autoCropWidth="360" :autoCropHeight="606" :canMoveBox="true" :canMove="true"
-                  :fixedBox="false" :centerBox="true" :ref="el => cropper[index] = el" :info="false" mode="cover"
-                  :fillColor="'white'" />
+                  :autoCrop="false" :autoCropWidth="1080" :autoCropHeight="1350 / PictureToggle" :canMoveBox="true"
+                  :canMove="true" :fixedBox="false" :centerBox="true" :ref="el => cropper[index] = el" :info="false"
+                  mode="cover" :fillColor="'white'" />
                 <video v-else-if="file.type === 'video'" :src="file.content" :ref="el => videoRefs[index] = el"
                   style="width: 100%; height: 100%; object-fit: cover;" muted autoplay loop playsinline></video>
               </div>
@@ -552,18 +547,33 @@ const ImgMode = ref('straight');
           </div>
         </div>
       </div>
-      <div v-if="PictureToggle == '4'">
+
+      <div v-else-if="PictureToggle > 3">
+        <v-btn-toggle v-model="ImgMode" class="mx-auto my-4 w-full justify-center" mandatory v-if="PictureToggle !== 4">
+          <v-btn value="straight" class="mx-1 border px-2 py-2 rounded">直</v-btn>
+          <v-btn value="horizontal" class="mx-1 border px-2 py-2 rounded">橫</v-btn>
+        </v-btn-toggle>
         <div
           :class="['imgContainer mx-auto', { 'squareOutside': PictureSize == '1x1', 'defaultOutside': PictureSize == '4x5', 'horizontalOutside': PictureSize == '16x9', 'storyOutside': PictureSize == '9x16' }]">
           <div id="imagePreview"
             :class="['w-full flex flex-wrap justify-start items-start', { 'square': PictureSize == '1x1', 'default': PictureSize == '4x5', 'horizontal': PictureSize == '16x9', 'story': PictureSize == '9x16' }]">
             <template v-for="(file, index) in TempImg" :key="index">
-              <div
-                style="width: calc(100% / 2 + 1px); height: calc(100% / 2 + 1px); margin-right: -1px; margin-bottom: -1px; position: relative; overflow: hidden; background: black;">
+              <div v-if="ImgMode == 'straight'"
+                :style="`width: calc(100% / ${PictureToggle / 2} + 1px); height: calc(100% / 2 + 1px); margin-right: -1px; margin-bottom: -1px; position: relative; overflow: hidden; background: black;`">
                 <VueCropper v-if="file.type === 'image'" :img="file.content" :outputSize="1" outputType="jpeg"
-                  :autoCrop="false" :autoCropWidth="540" :autoCropHeight="675" :canMoveBox="true" :canMove="true"
-                  :fixedBox="false" :centerBox="true" :ref="el => cropper[index] = el" :info="false" mode="cover"
-                  :fillColor="'white'" />
+                  :autoCrop="false" :autoCropWidth="1080 / PictureToggle / 2" :autoCropHeight="675" :canMoveBox="true"
+                  :canMove="true" :fixedBox="false" :centerBox="true" :ref="el => cropper[index] = el" :info="false"
+                  mode="cover" :fillColor="'white'" />
+                <video v-else-if="file.type === 'video'" :src="file.content" :ref="el => videoRefs[index] = el"
+                  style="width: 100%; height: 100%; object-fit: cover;" muted autoplay loop playsinline></video>
+              </div>
+              <div
+                :style="`width: calc(50%); height:calc(100% / ${PictureToggle / 2} + 1px) ; margin-bottom: -1px; position: relative; overflow: hidden;`"
+                v-else-if="ImgMode == 'horizontal'">
+                <VueCropper v-if="file.type === 'image'" :img="file.content" :outputSize="1" outputType="jpeg"
+                  :autoCrop="false" :autoCropWidth="540" :autoCropHeight="1350 / PictureToggle / 2" :canMoveBox="true"
+                  :canMove="true" :fixedBox="false" :centerBox="true" :ref="el => cropper[index] = el" :info="false"
+                  mode="cover" :fillColor="'white'" />
                 <video v-else-if="file.type === 'video'" :src="file.content" :ref="el => videoRefs[index] = el"
                   style="width: 100%; height: 100%; object-fit: cover;" muted autoplay loop playsinline></video>
               </div>
