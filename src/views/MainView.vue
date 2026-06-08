@@ -465,10 +465,10 @@ const ImgMode = ref('straight');
   <div class="my-2">
     <h2 class="text-center text-lg font-bold">１、請選擇發文尺寸</h2>
     <v-btn-toggle v-model="PictureSize" class="mx-auto my-4 w-full justify-center" mandatory>
-      <v-btn value="1x1">正方形</v-btn>
-      <v-btn value="4x5">直式</v-btn>
-      <v-btn value="16x9">橫式</v-btn>
-      <v-btn value="9x16">限時動態</v-btn>
+      <v-btn class="mx-1 my-2 border px-2 rounded" value="1x1">正方形</v-btn>
+      <v-btn class="mx-1 my-2 border px-2 rounded" value="4x5">直式</v-btn>
+      <v-btn class="mx-1 my-2 border px-2 rounded" value="16x9">橫式</v-btn>
+      <v-btn class="mx-1 my-2 border px-2 rounded" value="9x16">限時動態</v-btn>
     </v-btn-toggle>
   </div>
   <div class="my-2">
@@ -487,7 +487,7 @@ const ImgMode = ref('straight');
     </v-btn-toggle>
     <h2 class="text-center text-lg font-bold">３、上傳圖片</h2>
     <v-file-input label="上傳照片" :hide-input="true" placeholder="上傳照片" prepend-icon="mdi-image" type="file"
-      accept="image/*,video/*" @change="fileUpload" multiple class="mx-auto w-1/2 my-4" />
+      accept="image/*,video/*" @change="fileUpload" multiple class="mx-auto w-fit my-4 border py-2 px-2 rounded-full" />
   </div>
   <div class="w-full lg:flex justify-center items-start">
     <div class="w-11/12 lg:w-1/3 mx-auto my-4">
@@ -515,8 +515,8 @@ const ImgMode = ref('straight');
 
       <div v-else-if="PictureToggle <= 3">
         <v-btn-toggle v-model="ImgMode" class="mx-auto my-4 w-full justify-center" mandatory>
-          <v-btn value="straight">直</v-btn>
-          <v-btn value="horizontal">橫</v-btn>
+          <v-btn value="straight" class="mx-1 border px-2 py-2 rounded">直</v-btn>
+          <v-btn value="horizontal" class="mx-1 border px-2 py-2 rounded">橫</v-btn>
         </v-btn-toggle>
         <div
           :class="['imgContainer mx-auto', { 'squareOutside': PictureSize == '1x1', 'defaultOutside': PictureSize == '4x5', 'horizontalOutside': PictureSize == '16x9', 'storyOutside': PictureSize == '9x16' }]">
@@ -584,8 +584,8 @@ const ImgMode = ref('straight');
     </div>
     <div class="my-2 flex flex-wrap justify-center w-full lg:w-[300px] mx-auto">
       <h2 class="my-2 text-center text-lg font-bold w-full">５、點擊「下載」可儲存至「檔案」<br> 點擊「預覽」可以查看組合好的圖片</h2>
-      <v-btn @click="Download" class="mx-2">下載</v-btn>
-      <v-btn @click="ReviewImg" class="mx-2">預覽</v-btn>
+      <v-btn @click="Download" class="mx-2 text-white" color="#bababa">下載</v-btn>
+      <v-btn @click="ReviewImg" class="mx-2 text-white" color="#bababa">預覽</v-btn>
     </div>
     <div class="my-4 w-11/12 lg:w-1/3 max-w-[1080px] mx-auto" v-if="finalPreviewUrl">
       <h2 class="text-center text-lg font-bold">
