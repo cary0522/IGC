@@ -1,1 +1,5 @@
 @import "tailwindcss";
+
+#app {
+    padding-bottom: 100px;
+}
