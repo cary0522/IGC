@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 
 // 是否顯示懸浮氣泡提示安裝app
 const showBubble = ref(false);
@@ -27,7 +27,29 @@ onMounted(() => {
   if (isStandalone()) return;
 
   platform.value = detectPlatform();
-  showBubble.value = true;
+
+  // 1. Android / Chrome 專用監聽
+  window.addEventListener('beforeinstallprompt', (e) => {
+    // 阻止原本的自動提示
+    e.preventDefault();
+    // 儲存事件以便之後點擊觸發
+    deferredPrompt.value = e;
+    // 顯示右下角氣泡
+    showBubble.value = true;
+  });
+
+  // 2. 監聽全域自定義事件 (例如下載成功後由其它元件觸發)
+  window.addEventListener('show-pwa-install', showPwaBubble);
+});
+
+const showPwaBubble = () => {
+  if (!isStandalone()) {
+    showBubble.value = true;
+  }
+};
+
+onBeforeUnmount(() => {
+  window.removeEventListener('show-pwa-install', showPwaBubble);
 });
 
 const handleBubbleClick = async () => {
